@@ -1,7 +1,8 @@
 ﻿using System;
 using MySqlConnector;
 using System.Security.Cryptography; // Komentar: untuk hash password
-using System.Text; // Komentar: untuk encoding string ke byte
+using System.Text;
+using System.Data.Common; // Komentar: untuk encoding string ke byte
 
 class Program
 {
@@ -298,7 +299,7 @@ class Program
         Console.Write("Deskripsi tugas (boleh kosong): ");
         string? description = Console.ReadLine();
 
-        Console.Write("Masukkan tanggal dan jam deadline (dd/mm/yyyy HH:mm) *boleh kosong:");
+        Console.Write("Masukkan tanggal dan jam deadline (dd/mm/yyyy HH:mm) *boleh kosong: ");
         string? deadlineinput = Console.ReadLine();
 
         DateTime? dueDate = null;
@@ -349,21 +350,101 @@ class Program
     static void hapustugas()
     {
         Console.Clear();
-        Console.WriteLine("Ini adalah fungsi untuk menghapus tugas");
-        Console.Write("Tekan enter untuk kembali ke menu utama");
-        Console.Write("Tekan enter untuk kembali ke menu utama");
+        Console.WriteLine("----- HAPUS TUGAS -----");
+
+        //tampilkan semua tugas terlebih dahulu
+        TampilkanDaftarTugasDenganStatus();
+
+        Console.Write("\nMasukkan ID tugas yang ingin dihapus (atau 0 untuk batal): ");
+
+        if (!int.TryParse(Console.ReadLine(), out int taskId))
+        {
+            Console.WriteLine("Input tidak valid!");
+            Console.WriteLine("Tekan enter untuk kembali ke menu utama...");
+            Console.ReadLine();
+            return;
+        }
+        if (taskId == 0)
+        {
+            Console.WriteLine("Penghapusan tugas dibatalkan.");
+            Console.WriteLine("Tekan enter untuk kembali ke menu utama...");
+            Console.ReadLine();
+            return;
+        }
+
+        try
+        {
+            using MySqlConnection conn = new MySqlConnection(connectionString);
+            conn.Open();
+
+            //mengecek apakah tugas ada dan milik user yang login
+            string checkQuery = "SELECT id, title FROM tasks WHERE id = @id AND user_id = @user_id";
+            using (MySqlCommand checkCmd = new MySqlCommand(checkQuery, conn))
+            {
+                checkCmd.Parameters.AddWithValue("@id", taskId);
+                checkCmd.Parameters.AddWithValue("@user_id", user_id);
+
+                using (MySqlDataReader baca = checkCmd.ExecuteReader())
+                {
+                    if (!baca.HasRows)
+                    {
+                        Console.WriteLine("Tugas tidak ditemukan atau tidak memiliki akses untuk menghapus!");
+                        Console.WriteLine("Tekan ennter untuk kembali ke menu utama...");
+                        Console.ReadLine();
+                        return;
+                    }
+                    baca.Read();
+                    string taskTitle = baca.GetString("title");
+                    baca.Close();
+
+                    //konfirmasi penghapusan
+                    Console.Write($"Apakah anda yakin ingin menghapus tugas '{taskTitle}'? (y/n): ");
+                    string? konfirmasi = Console.ReadLine()?.ToLower();
+                    if (konfirmasi != "y" && konfirmasi != "ya")
+                    {
+                        Console.WriteLine("Penghapusan tugas dibatalkan.");
+                        Console.WriteLine("Tekan enter untuk kembali ke menu utama...");
+                        Console.ReadLine();
+                        return;
+                    }
+                    //hapus tugas
+                    string hapusQuery = "DELETE FROM tasks WHERE id = @id AND user_id = @user_id";
+                    using (MySqlCommand hapusCmd = new MySqlCommand(hapusQuery, conn))
+                    {
+                        hapusCmd.Parameters.AddWithValue("@id", taskId);
+                        hapusCmd.Parameters.AddWithValue("@user_id", user_id);
+
+                        int rowsAffected = hapusCmd.ExecuteNonQuery();
+                        if (rowsAffected > 0)
+                        {
+                            Console.WriteLine("Tugas berhasil dihapus.");
+                        }
+                        else
+                        {
+                            Console.WriteLine("Gagal menghapus tugas. silahkan coba lagi.");
+                        }
+                    }
+                }
+
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"terjadi Error: {ex.Message}");
+
+        }
+        Console.WriteLine("Tekan enter untuk kembali ke menu utama...");
         Console.ReadLine();
-       
     }
-        static void tampilkansemuatugas()
-{
-    Console.Clear();
-    Console.WriteLine("------ DAFTAR SEMUA TUGAS ------");
+    static void tampilkansemuatugas()
+    {
+        Console.Clear();
+        Console.WriteLine("------ DAFTAR SEMUA TUGAS ------");
 
-    using MySqlConnection conn = new MySqlConnection(connectionString);
-    conn.Open();
+        using MySqlConnection conn = new MySqlConnection(connectionString);
+        conn.Open();
 
-    string query = @"SELECT 
+        string query = @"SELECT 
                         id, 
                         title, 
                         COALESCE(description, '-') AS description, 
@@ -374,9 +455,9 @@ class Program
                     WHERE user_id = @user_id
                     ORDER BY due_date ASC;";
 
-    using (MySqlCommand cmd = new MySqlCommand(query, conn))
-    {
-        cmd.Parameters.AddWithValue("@user_id", user_id);
+        using (MySqlCommand cmd = new MySqlCommand(query, conn))
+        {
+            cmd.Parameters.AddWithValue("@user_id", user_id);
 
             using (MySqlDataReader reader = cmd.ExecuteReader())
             {
@@ -423,7 +504,7 @@ class Program
                             $"│ {title} " +
                             $"│ {description} " +
                             $"│ {statusStr.PadRight(8)} " +
-                            
+
                             $"│ {dueDateText.PadRight(19)} " +
                             $"│ {createdAt:dd/MM/yyyy HH:mm} │");
                     }
@@ -431,8 +512,50 @@ class Program
                     Console.WriteLine("└─────┴──────────────────────┴──────────────────────┴──────────┴─────────────────────┴─────────────────────┘");
                 }
                 Console.WriteLine("\nTekan enter untuk kembali ke menu utama...");
-            Console.ReadLine();
+                Console.ReadLine();
+            }
         }
+    }
+// Fungsi untuk menampilkan daftar tugas dengan status
+static void TampilkanDaftarTugasDenganStatus()
+{
+    try
+    {
+        using MySqlConnection conn = new MySqlConnection(connectionString);
+        conn.Open();
+
+        string query = @"SELECT id, title, status 
+                        FROM tasks WHERE user_id = @user_id 
+                        ORDER BY status, id DESC";
+        using (MySqlCommand cmd = new MySqlCommand(query, conn))
+        {
+            cmd.Parameters.AddWithValue("@user_id", user_id);
+            
+            using (MySqlDataReader reader = cmd.ExecuteReader())
+            {
+                Console.WriteLine("\nDaftar Tugas Anda:");
+                Console.WriteLine("┌─────┬────────────────────────────┬──────────┐");
+                Console.WriteLine("│ ID  │ Judul Tugas                │ Status   │");
+                Console.WriteLine("├─────┼────────────────────────────┼──────────┤");
+                
+                while (reader.Read())
+                {
+                    int id = reader.GetInt32("id");
+                    string title = reader.GetString("title");
+                    string status = reader.GetString("status");
+                    
+                    string truncatedTitle = title.Length > 25 ? title.Substring(0, 22) + "..." : title;
+                    string statusDisplay = status == "completed" ? "Selesai" : "Pending";
+                    
+                    Console.WriteLine($"│ {id,-3} │ {truncatedTitle,-26} │ {statusDisplay,-8} │");
+                }
+                Console.WriteLine("└─────┴────────────────────────────┴──────────┘");
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error menampilkan daftar tugas: {ex.Message}");
     }
 }
 

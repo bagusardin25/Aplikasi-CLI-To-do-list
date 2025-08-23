@@ -17,3 +17,4 @@ C:\Users\Bagus Ardin\OneDrive\Dokumen\TodolistC#\bin\Debug\net9.0\Microsoft.Exte
 C:\Users\Bagus Ardin\OneDrive\Dokumen\TodolistC#\bin\Debug\net9.0\MySqlConnector.dll
 C:\Users\Bagus Ardin\OneDrive\Dokumen\TodolistC#\obj\Debug\net9.0\TodolistC#.csproj.AssemblyReference.cache
 C:\Users\Bagus Ardin\OneDrive\Dokumen\TodolistC#\obj\Debug\net9.0\TodolistC#.csproj.Up2Date
+C:\Users\Bagus Ardin\OneDrive\Dokumen\TodolistC#\obj\Debug\net9.0\TodolistC#.sourcelink.json
