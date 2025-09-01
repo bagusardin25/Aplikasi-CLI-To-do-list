@@ -2,7 +2,11 @@
 using MySqlConnector;
 using System.Security.Cryptography; // Komentar: untuk hash password
 using System.Text;
-using System.Data.Common; // Komentar: untuk encoding string ke byte
+using System.Data.Common;
+using System.Net;
+using System.ComponentModel.Design;
+using System.Data;
+using Microsoft.VisualBasic; // Komentar: untuk encoding string ke byte
 
 class Program
 {
@@ -26,34 +30,34 @@ class Program
     }
     // Fungsi untuk membaca password dari console dan menampilkan * setiap karakter
     static string ReadPassword()
-{
-    string password = "";
-    ConsoleKeyInfo key;
-
-    do
     {
-        key = Console.ReadKey(true);
+        string password = "";
+        ConsoleKeyInfo key;
 
-        // Kalau bukan Backspace dan bukan Enter
-        if (key.Key != ConsoleKey.Backspace && key.Key != ConsoleKey.Enter)
+        do
         {
-            password += key.KeyChar;    // Tambah ke variabel password
-            Console.Write("*");         // Cetak * di layar
-        }
-        else if (key.Key == ConsoleKey.Backspace && password.Length > 0)
-        {
-            // Hapus karakter terakhir di password
-            password = password.Substring(0, password.Length - 1);
+            key = Console.ReadKey(true);
 
-            // Hapus * terakhir di console
-            Console.Write("\b \b");
+            // Kalau bukan Backspace dan bukan Enter
+            if (key.Key != ConsoleKey.Backspace && key.Key != ConsoleKey.Enter)
+            {
+                password += key.KeyChar;    // Tambah ke variabel password
+                Console.Write("*");         // Cetak * di layar
+            }
+            else if (key.Key == ConsoleKey.Backspace && password.Length > 0)
+            {
+                // Hapus karakter terakhir di password
+                password = password.Substring(0, password.Length - 1);
+
+                // Hapus * terakhir di console
+                Console.Write("\b \b");
+            }
         }
+        while (key.Key != ConsoleKey.Enter);
+
+        Console.WriteLine(); // Pindah baris setelah tekan Enter
+        return password;
     }
-    while (key.Key != ConsoleKey.Enter);
-
-    Console.WriteLine(); // Pindah baris setelah tekan Enter
-    return password;
-}
 
 
     private static void Main(string[] args)
@@ -237,8 +241,6 @@ class Program
                 Console.WriteLine("6. Tampilkan Tugas Selesai");
                 Console.WriteLine("7. Tandai Tugas Selesai");
                 Console.WriteLine("8. Statistik Tugas");
-                Console.WriteLine("9. Cari Tugas");
-                Console.WriteLine("10 Simpan / Muat Database");
                 Console.WriteLine("0. Keluar");
                 Console.Write("Pilih menu (1-10): ");
 
@@ -271,12 +273,6 @@ class Program
                     case "8":
                         Statistik();
                         break;
-                    case "9":
-                        caritugas();
-                        break;
-                    case "10":
-                        simpanmuatandatabase();
-                        break;
                     case "0":
                         Console.WriteLine("Terima kasih telah menggunakan aplikasi To Do List. Sampai jumpa!");
                         isRunning = false;
@@ -289,64 +285,210 @@ class Program
             }
         }
     }
+
     static void tambahtugas()
     {
         Console.Clear();
         Console.WriteLine("----- TAMBAH TUGAS -----");
-        Console.Write("Judul tugas: ");
-        string? title = Console.ReadLine();
-
-        Console.Write("Deskripsi tugas (boleh kosong): ");
-        string? description = Console.ReadLine();
-
-        Console.Write("Masukkan tanggal dan jam deadline (dd/mm/yyyy HH:mm) *boleh kosong: ");
-        string? deadlineinput = Console.ReadLine();
-
-        DateTime? dueDate = null;
-        if (!string.IsNullOrWhiteSpace(deadlineinput))
+        string? title;
+        while (true)
         {
-            // Coba parsing dengan format "dd/MM/yyyy HH:mm"
-            if (DateTime.TryParseExact(deadlineinput, "dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime parsedDateTime))
+            Console.Write("Judul tugas: ");
+            title = Console.ReadLine();
+
+            if (string.IsNullOrWhiteSpace(title))
             {
-                dueDate = parsedDateTime;
+                Console.WriteLine("Judul tugas wajib diisi");
+                Console.WriteLine("Tekan enter untuk kembali...");
+                Console.ReadKey();
             }
             else
             {
-                Console.WriteLine("Format tanggal tidak valid. Silakan masukkan dalam format dd/MM/yyyy HH:mm.");
-                Console.ReadLine();
-                return; // Keluar dari fungsi jika format salah
+                break;
             }
         }
 
-        using MySqlConnection conn = new MySqlConnection(connectionString);
 
-        conn.Open();
-        string query = @"INSERT INTO tasks (user_id, title, description, status, due_date, created_at, updated_at)
+            Console.Write("Deskripsi tugas (boleh kosong): ");
+            string? description = Console.ReadLine();
+
+            Console.Write("Masukkan tanggal dan jam deadline (dd/mm/yyyy HH:mm) *boleh kosong: ");
+            string? deadlineinput = Console.ReadLine();
+
+            DateTime? dueDate = null;
+            if (!string.IsNullOrWhiteSpace(deadlineinput))
+            {
+                // Coba parsing dengan format "dd/MM/yyyy HH:mm"
+                if (DateTime.TryParseExact(deadlineinput, "dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime parsedDateTime))
+                {
+                    dueDate = parsedDateTime;
+                }
+                else
+                {
+                    Console.WriteLine("Format tanggal tidak valid. Silakan masukkan dalam format dd/MM/yyyy HH:mm.");
+                    Console.ReadLine();
+                    return; // Keluar dari fungsi jika format salah
+                }
+            
+
+            using MySqlConnection conn = new MySqlConnection(connectionString);
+
+            conn.Open();
+            string query = @"INSERT INTO tasks (user_id, title, description, status, due_date, created_at, updated_at)
                         VALUES (@user_id, @title, @description, 'pending', @due_date, NOW(), NOW());";
-        using (MySqlCommand cmd = new MySqlCommand(query, conn))
-        {
-            // Gunakan user_id dari variabel global
-            cmd.Parameters.AddWithValue("@user_id", user_id); // Komentar: user_id diambil dari user yang login
-            cmd.Parameters.AddWithValue("@title", title);
-            cmd.Parameters.AddWithValue("@description", description);
-            cmd.Parameters.AddWithValue("@due_date", (object?)dueDate ?? DBNull.Value);
+            using (MySqlCommand cmd = new MySqlCommand(query, conn))
+            {
+                // Gunakan user_id dari variabel global
+                cmd.Parameters.AddWithValue("@user_id", user_id); // Komentar: user_id diambil dari user yang login
+                cmd.Parameters.AddWithValue("@title", title);
+                cmd.Parameters.AddWithValue("@description", description);
+                cmd.Parameters.AddWithValue("@due_date", (object?)dueDate ?? DBNull.Value);
 
-            cmd.ExecuteNonQuery(); // Komentar: eksekusi query untuk menambah tugas
+                cmd.ExecuteNonQuery(); // Komentar: eksekusi query untuk menambah tugas
+            }
+            Console.WriteLine("Tugas berhasil ditambahkan!");
+            Console.WriteLine("Tekan enter untuk kembali ke menu utama...");
+            Console.ReadLine();
+            return;
         }
-        Console.WriteLine("Tugas berhasil ditambahkan!");
-        Console.WriteLine("Tekan enter untuk kembali ke menu utama...");
-        Console.ReadLine();
-        return;
     }
 
     static void edittugas()
-    {
-        Console.Clear();
-        Console.WriteLine(" Belum ada isinya");
-        Console.Write("Tekan enter untuk kembali ke menu utama");
-        Console.ReadLine();
-        return;
-    }
+        {
+            Console.Clear();
+            Console.WriteLine("----- HALAMAN EDIT TUGAS -----");
+
+            //tampilkan semua tugas terlebih dahulu
+            TampilkanDaftarTugasDenganStatus();
+            Console.Write("\nMasukkan ID tugas yang ingin di edit (atau 0 untuk batal): ");
+            if (!int.TryParse(Console.ReadLine(), out int taskId))
+            {
+                Console.WriteLine("Input tidak valid!");
+                Console.WriteLine("Tekan enter untuk kembali ke menu utama...");
+                Console.ReadLine();
+                return;
+            }
+            if (taskId == 0)
+            {
+                Console.WriteLine("Pengeditan tugas dibatalkan.");
+                Console.WriteLine("Tekan enter untuk kembali ke menu utama...");
+                Console.ReadLine();
+                return;
+            }
+
+            try
+            {
+                using MySqlConnection conn = new MySqlConnection(connectionString);
+                conn.Open();
+
+                //mengecek apakah tugas ada dan milik user yang login
+                string checkQuery = "SELECT id, title, description, status, due_date FROM tasks WHERE id = @id AND user_id = @user_id";
+                using (MySqlCommand checkCmd = new MySqlCommand(checkQuery, conn))
+                {
+                    checkCmd.Parameters.AddWithValue("@id", taskId);
+                    checkCmd.Parameters.AddWithValue("@user_id", user_id);
+
+                    using (MySqlDataReader baca = checkCmd.ExecuteReader())
+                    {
+                        if (!baca.HasRows)
+                        {
+                            Console.WriteLine("Tugas tidak ditemukan atau tidak memiliki akses untuk mengedit!");
+                            Console.WriteLine("Tekan enter untuk kembali ke menu utama...");
+                            Console.ReadLine();
+                            return;
+                        }
+                        baca.Read();
+                        string currentTitle = baca.GetString("title");
+                        string currentDescription = baca.IsDBNull(baca.GetOrdinal("description")) ? "" : baca.GetString("description");
+                        string currentStatus = baca.GetString("status");
+                        DateTime? currentDueDate = baca.IsDBNull(baca.GetOrdinal("due_date")) ? null : baca.GetDateTime("due_date");
+                        baca.Close();
+
+                        //tampilkan data tuga saat ini
+                        Console.WriteLine("\nData tugas saat ini: ");
+                        Console.WriteLine($"Judul: {currentTitle} ");
+                        Console.WriteLine($"Deskripsi: {currentDescription}");
+                        if (currentDueDate.HasValue)
+                        {
+                            string countdownInfo;
+                            if (currentStatus == "completed")
+                            {
+                                countdownInfo = "✅ selesai";
+                            }
+                            else
+                            {
+                                countdownInfo = hitungmundur(currentDueDate.Value);
+                            }
+
+                            Console.WriteLine($"Deadline: {currentDueDate.Value.ToString("dd/MM/yyyy HH:mm")} ({countdownInfo})");
+                        }
+                        else
+                        {
+                            if (currentStatus == "completed")
+                            {
+                                Console.WriteLine($"Deadline: - (✅ Selesai)");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"Deadline: - (Tidak ada deadline)");
+                            }
+                        }
+                        //input data baru
+                        Console.WriteLine("\nMasukkan data baru(tekan enter untuk tidak mengubah)");
+                        Console.Write("Judul baru: ");
+                        string? newTitle = Console.ReadLine();
+                        Console.Write("Deskripsi tugas: ");
+                        string? newDescription = Console.ReadLine();
+                        Console.Write("Deadline: (dd/MM/yyyy HH:mm): ");
+                        string? newDeadLineInput = Console.ReadLine();
+
+                        DateTime? newDueDate = null;
+                        if (!string.IsNullOrWhiteSpace(newDeadLineInput))
+                        {
+                            // Coba parsing dengan format "dd/MM/yyyy HH:mm"
+                            if (DateTime.TryParseExact(newDeadLineInput, "dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime parsedDateTime))
+                            {
+                                newDueDate = parsedDateTime;
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("Format tanggal tidak valid. Deadline tidak diubah.");
+                            newDueDate = currentDueDate; // tetap gunakan deadline lama
+                        }
+                        string upDateQuery = @"UPDATE tasks SET title = COALESCE (NULLIF(@title, ''), title), description = COALESCE (NULLIF(@description, ''), description), due_date = COALESCE(@due_date, due_date), updated_at = NOW() WHERE id = @id AND user_id = @user_id";
+                        using (MySqlCommand upDateCmd = new MySqlCommand(upDateQuery, conn))
+                        {
+                            upDateCmd.Parameters.AddWithValue("@id", taskId);
+                            upDateCmd.Parameters.AddWithValue("@user_id", user_id);
+                            upDateCmd.Parameters.AddWithValue("@title", string.IsNullOrWhiteSpace(newTitle) ? DBNull.Value : newTitle);
+                            upDateCmd.Parameters.AddWithValue("@description", string.IsNullOrWhiteSpace(newDescription) ? DBNull.Value : newDescription);
+                            upDateCmd.Parameters.AddWithValue("@due_date", (object?)newDueDate ?? DBNull.Value);
+                            int rowsAffected = upDateCmd.ExecuteNonQuery();
+                            if (rowsAffected > 0)
+                            {
+                                Console.WriteLine("Tugas berhasil diupdate.");
+                                Console.WriteLine("Tekan enter untuk kembali ke menu utama...");
+                                Console.ReadLine();
+                                return;
+                            }
+                            else
+                            {
+                                Console.WriteLine("Tidak ada perubahan yang dilakukan.");
+                            }
+
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"terjadi Error: {ex.Message}");
+
+            }
+            Console.WriteLine("Tekan enter untuk kembali ke menu utama...");
+            Console.ReadLine();
+        }
     static void hapustugas()
     {
         Console.Clear();
@@ -468,125 +610,417 @@ class Program
                 else
                 {
                     // Header tabel
-                    Console.WriteLine("\n┌─────┬──────────────────────┬──────────────────────┬──────────┬─────────────────────┬─────────────────────┐");
-                    Console.WriteLine("│ ID  │ Judul                │ Deskripsi            │ Status   │ Deadline            │ Dibuat Pada         │");
-                    Console.WriteLine("├─────┼──────────────────────┼──────────────────────┼──────────┼─────────────────────┼─────────────────────┤");
+                    Console.WriteLine("\n┌─────┬──────────────────────┬──────────────────────┬─────────────┬────────────────────────────────┬─────────────────────┐");
+                    Console.WriteLine("│ ID  │ Judul                │ Deskripsi            │ Status      │ Deadline                       │ Dibuat Pada         │");
+                    Console.WriteLine("├─────┼──────────────────────┼──────────────────────┼─────────────┼────────────────────────────────┼─────────────────────┤");
 
-                    while (reader.Read())
-                    {
-                        // Ambil due_date dengan aman (bisa null)
-                        string dueDateText;
-                        if (reader.IsDBNull(reader.GetOrdinal("due_date")))
-                            dueDateText = "-";
-                        else
-                            dueDateText = reader.GetDateTime("due_date").ToString("dd/MM/yyyy HH:mm");
+while (reader.Read())
+{
+    // Ambil data dari reader
+    int id = reader.GetInt32("id");
+    string title = reader.GetString("title");
+    string description = reader.IsDBNull(reader.GetOrdinal("description")) ? "-" : reader.GetString("description");
+    string status = reader.GetString("status");
+    DateTime? dueDate = reader.IsDBNull(reader.GetOrdinal("due_date")) ? null : reader.GetDateTime("due_date");
+    DateTime createdAt = reader.GetDateTime("created_at");
 
-                        // Ambil created_at (wajib ada)
-                        DateTime createdAt = reader.GetDateTime("created_at");
+    // Format title (maks 20 char)
+    string formattedTitle = title.Length > 20 ? title.Substring(0, 20) : title;
+    formattedTitle = formattedTitle.PadRight(20);
 
-                        // Title (maks 20 char + padding)
-                        string title = reader["title"]?.ToString() ?? "-";
-                        if (title.Length > 20) title = title.Substring(0, 20);
-                        title = title.PadRight(20);
+    // Format description (maks 20 char)
+    string formattedDescription = description.Length > 20 ? description.Substring(0, 20) : description;
+    formattedDescription = formattedDescription.PadRight(20);
 
-                        // Description (maks 20 char + padding)
-                        string description = reader["description"]?.ToString() ?? "-";
-                        if (description.Length > 20) description = description.Substring(0, 20);
-                        description = description.PadRight(20);
+    // Format status
+    string formattedStatus = status.PadRight(11);
+    if (status == "completed") 
+    {
+        formattedStatus = "Selesai".PadRight(11);
+    }
+    else 
+    {
+        formattedStatus = "Pending".PadRight(11);
+    }
 
-                        // ID dan status
-                        string idStr = reader["id"]?.ToString() ?? "-";
-                        string statusStr = reader["status"]?.ToString() ?? "-";
+    // Format deadline dengan countdown
+// Gunakan format yang sama untuk semua
+string deadlineText;
+if (dueDate.HasValue)
+{
+    string datePart = dueDate.Value.ToString("dd/MM/yy HH:mm");
+    
+    if (status == "completed")
+    {
+        deadlineText = $"{datePart} (✅)";
+    }
+    else
+    {
+        string countdownInfo = hitungmundur(dueDate.Value);
+        // Buat countdown lebih compact
+        countdownInfo = countdownInfo.Replace("hari", "d")
+                                  .Replace("jam", "j")
+                                  .Replace("menit", "m")
+                                  .Replace("detik", "d")
+                                  .Replace("Terlewat", "")
+                                  .Replace("lagi", "");
+        deadlineText = $"{datePart} ({countdownInfo})";
+    }
+}
+else
+{
+    deadlineText = status == "completed" ? "- (✅)" : "-";
+}
 
-                        // Cetak baris tabel
-                        Console.WriteLine(
-                            $"│ {idStr.PadLeft(3)} " +
-                            $"│ {title} " +
-                            $"│ {description} " +
-                            $"│ {statusStr.PadRight(8)} " +
+// Pastikan panjang konsisten
+deadlineText = deadlineText.PadRight(25);
+    // Cetak baris tabel
+    Console.WriteLine(
+        $"│ {id.ToString().PadLeft(3)} " +
+        $"│ {formattedTitle} " +
+        $"│ {formattedDescription} " +
+        $"│ {formattedStatus} " +
+        $"│ {deadlineText} " +
+        $"│ {createdAt:dd/MM/yyyy HH:mm} │");
+}
 
-                            $"│ {dueDateText.PadRight(19)} " +
-                            $"│ {createdAt:dd/MM/yyyy HH:mm} │");
-                    }
-
-                    Console.WriteLine("└─────┴──────────────────────┴──────────────────────┴──────────┴─────────────────────┴─────────────────────┘");
+                    Console.WriteLine("└─────┴──────────────────────┴──────────────────────┴─────────────┴───────────────────────────────┴─────────────────────┘");
                 }
                 Console.WriteLine("\nTekan enter untuk kembali ke menu utama...");
                 Console.ReadLine();
             }
         }
     }
-// Fungsi untuk menampilkan daftar tugas dengan status
-static void TampilkanDaftarTugasDenganStatus()
+    // Fungsi untuk menampilkan daftar tugas dengan status
+    static void TampilkanDaftarTugasDenganStatus()
+    {
+        try
+        {
+            using MySqlConnection conn = new MySqlConnection(connectionString);
+            conn.Open();
+            
+
+            string query = @"SELECT id, title, status, due_date
+                        FROM tasks WHERE user_id = @user_id 
+                        ORDER BY status, id DESC";
+                        
+            using (MySqlCommand cmd = new MySqlCommand(query, conn))
+            {
+                
+                cmd.Parameters.AddWithValue("@user_id", user_id);
+
+                using (MySqlDataReader reader = cmd.ExecuteReader())
+                {
+                    Console.WriteLine("\nDaftar Tugas Anda:");
+                    Console.WriteLine("┌─────┬────────────────────────────┬──────────┬──────────────────────────┐");
+                    Console.WriteLine("│ ID  │ Judul Tugas                │ Status   │ Deadline                 │");
+                    Console.WriteLine("├─────┼────────────────────────────┼──────────┼──────────────────────────┤");
+
+                    while (reader.Read())
+                    {
+                        int id = reader.GetInt32("id");
+                        string title = reader.GetString("title");
+                        string status = reader.GetString("status");
+                        DateTime? dueDate = reader.IsDBNull(reader.GetOrdinal("due_date")) ? null : reader.GetDateTime("due_date");
+
+                        string truncatedTitle = title.Length > 25 ? title.Substring(0, 22) + "..." : title;
+                        string statusDisplay = status == "completed" ? "Selesai" : "Pending";
+                        string infohitungmundur;
+                        if (status == "completed")
+                        {
+                            infohitungmundur = "✅ Selesai";
+                        }
+                        else if (!dueDate.HasValue)
+                        {
+                            infohitungmundur = "tidak ada deadline";
+                        }
+                        else
+                        {
+                            infohitungmundur = hitungmundur(dueDate.Value);
+                        }
+                        Console.WriteLine($"│ {id,-3} │ {truncatedTitle,-26} │ {statusDisplay,-8} │{infohitungmundur,-25}|");
+                    }
+                    Console.WriteLine("└─────┴────────────────────────────┴──────────┴──────────────────────────┘");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error menampilkan daftar tugas: {ex.Message}");
+        }
+    }
+static void tampilkantugasbelumselesai()
 {
+    Console.Clear();
+    Console.WriteLine("----- DAFTAR TUGAS BELUM SELESAI -----");
+
     try
     {
         using MySqlConnection conn = new MySqlConnection(connectionString);
         conn.Open();
 
-        string query = @"SELECT id, title, status 
-                        FROM tasks WHERE user_id = @user_id 
-                        ORDER BY status, id DESC";
+        string query = @"SELECT id, title, description, due_date, created_at 
+                        FROM tasks 
+                        WHERE user_id = @user_id AND status = 'pending' 
+                        ORDER BY due_date ASC, created_at DESC";
+        
         using (MySqlCommand cmd = new MySqlCommand(query, conn))
         {
             cmd.Parameters.AddWithValue("@user_id", user_id);
-            
+
             using (MySqlDataReader reader = cmd.ExecuteReader())
             {
-                Console.WriteLine("\nDaftar Tugas Anda:");
-                Console.WriteLine("┌─────┬────────────────────────────┬──────────┐");
-                Console.WriteLine("│ ID  │ Judul Tugas                │ Status   │");
-                Console.WriteLine("├─────┼────────────────────────────┼──────────┤");
+                if (!reader.HasRows)
+                {
+                    Console.WriteLine("\n🎉 Tidak ada tugas yang belum selesai!");
+                    Console.WriteLine("Semua tugas sudah completed. Good job! 👍");
+                    Console.WriteLine("\nTekan enter untuk kembali ke menu utama...");
+                    Console.ReadLine();
+                    return;
+                }
+
+                Console.WriteLine("\n┌─────┬────────────────────────────┬──────────────────────┬─────────────────────┬─────────────────────┐");
+                Console.WriteLine("│ ID  │ Judul Tugas                │ Deskripsi            │ Deadline           │ Dibuat Pada         │");
+                Console.WriteLine("├─────┼────────────────────────────┼──────────────────────┼─────────────────────┼─────────────────────┤");
+                
+                int jumlahtugas = 0;
                 
                 while (reader.Read())
                 {
+                    jumlahtugas++;
                     int id = reader.GetInt32("id");
                     string title = reader.GetString("title");
-                    string status = reader.GetString("status");
-                    
-                    string truncatedTitle = title.Length > 25 ? title.Substring(0, 22) + "..." : title;
-                    string statusDisplay = status == "completed" ? "Selesai" : "Pending";
-                    
-                    Console.WriteLine($"│ {id,-3} │ {truncatedTitle,-26} │ {statusDisplay,-8} │");
+                    string description = reader.IsDBNull(reader.GetOrdinal("description")) ? "-" : reader.GetString("description");
+                    DateTime? dueDate = reader.IsDBNull(reader.GetOrdinal("due_date")) ? null : reader.GetDateTime("due_date");
+                    DateTime? createdAt = reader.GetDateTime("created_at");
+
+                    // Format title (maks 25 karakter)
+                    string formatTitle = title.Length > 25 ? title.Substring(0, 22) + "..." : title;
+                    formatTitle = formatTitle.PadRight(25);
+
+                    // Format description (maks 20 karakter)
+                    string formatDeskripsi = description.Length > 20 ? description.Substring(0, 17) + "..." : description;
+                    formatDeskripsi = formatDeskripsi.PadRight(20);
+
+                    // Format deadline
+                    string deadlineText;
+                    if (dueDate.HasValue)
+                    {
+                        deadlineText = dueDate.Value.ToString("dd/MM/yyyy HH:mm");
+                    }
+                    else
+                    {
+                        deadlineText = "-";
+                    }
+                    deadlineText = deadlineText.PadRight(19);
+
+                    // Cetak baris tabel
+                    Console.WriteLine(
+                        $"│ {id.ToString().PadLeft(3)} " +
+                        $"│ {formatTitle} " +
+                        $"│ {formatDeskripsi} " +
+                        $"│ {deadlineText} " +
+                        $"│ {createdAt:dd/MM/yyyy HH:mm} │");
                 }
-                Console.WriteLine("└─────┴────────────────────────────┴──────────┘");
+
+                Console.WriteLine("└─────┴────────────────────────────┴──────────────────────┴─────────────────────┴─────────────────────┘");
+                
+                // Tampilkan jumlah tugas
+                Console.WriteLine($"\n📊 Total tugas belum selesai: {jumlahtugas} tugas");
             }
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Error menampilkan daftar tugas: {ex.Message}");
+        Console.WriteLine($"❌ Error: {ex.Message}");
+        Console.WriteLine("Silakan coba lagi atau hubungi administrator.");
     }
+
+    Console.WriteLine("\nTekan enter untuk kembali ke menu utama...");
+    Console.ReadLine();
 }
-
-
-
-    static void tampilkantugasbelumselesai()
-    {
-        Console.Clear();
-        Console.WriteLine("Ini adalah daftar tugas yang belum selesai: ");
-        Console.Write("Tekan enter untuk kembali ke menu utama");
-        Console.ReadLine();
-        return;
-    }
     static void tampilkantugasselesai()
     {
         Console.Clear();
-        Console.WriteLine("Ini adalah daftar tugas yang selesai: ");
-        Console.Write("Tekan enter untuk kembali ke menu utama");
-        Console.ReadLine();
-        return;
-    }
+        Console.WriteLine("----- HALAMAN TUGAS SELESAI");
+
+        try
+        {
+            using MySqlConnection conn = new MySqlConnection(connectionString);
+            conn.Open();
+
+            string query = @"SELECT id, title, description, due_date, created_at 
+                        FROM tasks 
+                        WHERE user_id = @user_id AND status = 'completed' 
+                        ORDER BY due_date ASC, created_at DESC";
+            using (MySqlCommand cmd = new MySqlCommand(query, conn))
+            {
+                cmd.Parameters.AddWithValue("@user_id", user_id);
+
+                using (MySqlDataReader baca = cmd.ExecuteReader())
+                {
+                    if (!baca.HasRows)
+                    {
+                        Console.WriteLine("\nBelum ada tugas yang selesai..");
+                        Console.WriteLine("Tekan enter untuk kembali...");
+                        Console.ReadLine();
+                        return;
+                    }
+                    Console.WriteLine("\n┌─────┬────────────────────────────┬──────────────────────┬─────────────────────┬─────────────────────┐");
+                    Console.WriteLine("│ ID  │ Judul Tugas                │ Deskripsi            │ Deadline           │ Dibuat Pada         │");
+                    Console.WriteLine("├─────┼────────────────────────────┼──────────────────────┼─────────────────────┼─────────────────────┤");
+
+                    int jumlahtugas = 0;
+                    while (baca.Read())
+                    {
+                        jumlahtugas++;
+                        int id = baca.GetInt32("id");
+                        string title = baca.GetString("title");
+                        string description = baca.IsDBNull(baca.GetOrdinal("description")) ? "-" : baca.GetString("description");
+                        DateTime? dueDate = baca.IsDBNull(baca.GetOrdinal("due_Date")) ? null : baca.GetDateTime("due_Date");
+                        DateTime? createdat = baca.GetDateTime("created_at");
+
+                        //format title
+                        string formatTitle = title.Length > 25 ? title.Substring(0, 22) + "..." : title;
+                        formatTitle = formatTitle.PadRight(25);
+                        //format deskripsi
+                        string formatDescription = description.Length > 20 ? description.Substring(0, 17) + "..." : description;
+                        formatDescription = formatDescription.PadRight(20);
+                        //format deadline
+                        string deadlineText;
+                        if (dueDate.HasValue)
+                        {
+                            deadlineText = dueDate.Value.ToString("dd/MM/yyyy HH:mm");
+                        }
+                        else
+                        {
+                            deadlineText = "-";
+                        }
+                        deadlineText = deadlineText.PadRight(19);
+                        //cetak tebal
+                        Console.WriteLine(
+                        $"│ {id.ToString().PadLeft(3)} " +
+                        $"│ {formatTitle} " +
+                        $"│ {formatDescription} " +
+                        $"│ {deadlineText} " +
+                        $"│ {deadlineText:dd/MM/yyyy HH:mm} │");
+                    }
+
+                    Console.WriteLine("└─────┴────────────────────────────┴──────────────────────┴─────────────────────┴─────────────────────┘");
+
+                    // Tampilkan jumlah tugas
+                    Console.WriteLine($"\n📊 Total tugas selesai: {jumlahtugas} tugas");
+                }
+            
+                       
+                    
+                    
                 
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+            Console.WriteLine("Silahkan coba lagi nanti");
+        }
+        Console.WriteLine("\nTekan enter untuk kembali ke menu utama...");
+        Console.ReadLine();
+    }
+
     static void tandaitugasselesai()
     {
         Console.Clear();
-        Console.WriteLine("belum ada isinya: ");
-        Console.Write("Tekan enter untuk kembali ke menu utama");
+        Console.WriteLine("----- TANDAI TUGAS SELESAI -----");
+
+        // Tampilkan tugas yang belum selesai
+        TampilkanDaftarTugasDenganStatus();
+
+        Console.Write("\nMasukkan ID tugas yang ingin ditandai selesai (atau 0 untuk batal): ");
+
+        if (!int.TryParse(Console.ReadLine(), out int taskId))
+        {
+            Console.WriteLine("Input tidak valid!");
+            Console.WriteLine("Tekan enter untuk kembali ke menu utama...");
+            Console.ReadLine();
+            return;
+        }
+
+        if (taskId == 0)
+        {
+            Console.WriteLine("Penandaan tugas dibatalkan.");
+            Console.WriteLine("Tekan enter untuk kembali ke menu utama...");
+            Console.ReadLine();
+            return;
+        }
+
+        try
+        {
+            using MySqlConnection conn = new MySqlConnection(connectionString);
+            conn.Open();
+
+            // Cek apakah tugas ada, belum selesai, dan milik user yang login
+            string checkQuery = "SELECT id, title, status FROM tasks WHERE id = @id AND user_id = @user_id AND status = 'pending'";
+            using (MySqlCommand checkCmd = new MySqlCommand(checkQuery, conn))
+            {
+                checkCmd.Parameters.AddWithValue("@id", taskId);
+                checkCmd.Parameters.AddWithValue("@user_id", user_id);
+
+                using (MySqlDataReader reader = checkCmd.ExecuteReader())
+                {
+                    if (!reader.HasRows)
+                    {
+                        Console.WriteLine("Tugas tidak ditemukan, sudah selesai, atau tidak memiliki akses!");
+                        Console.WriteLine("Tekan enter untuk kembali ke menu utama...");
+                        Console.ReadLine();
+                        return;
+                    }
+
+                    reader.Read();
+                    string taskTitle = reader.GetString("title");
+                    reader.Close();
+
+                    // Konfirmasi penandaan selesai
+                    Console.Write($"Apakah Anda yakin ingin menandai tugas '{taskTitle}' sebagai selesai? (y/n): ");
+                    string? confirmation = Console.ReadLine()?.ToLower();
+
+                    if (confirmation != "y" && confirmation != "ya")
+                    {
+                        Console.WriteLine("Penandaan tugas dibatalkan.");
+                        Console.WriteLine("Tekan enter untuk kembali ke menu utama...");
+                        Console.ReadLine();
+                        return;
+                    }
+
+                    // Update status menjadi completed
+                    string updateQuery = "UPDATE tasks SET status = 'completed', updated_at = NOW() WHERE id = @id AND user_id = @user_id";
+                    using (MySqlCommand updateCmd = new MySqlCommand(updateQuery, conn))
+                    {
+                        updateCmd.Parameters.AddWithValue("@id", taskId);
+                        updateCmd.Parameters.AddWithValue("@user_id", user_id);
+
+                        int rowsAffected = updateCmd.ExecuteNonQuery();
+
+                        if (rowsAffected > 0)
+                        {
+                            Console.WriteLine("✅ Tugas berhasil ditandai sebagai selesai!");
+                        }
+                        else
+                        {
+                            Console.WriteLine("❌ Gagal menandai tugas sebagai selesai.");
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Terjadi Error: {ex.Message}");
+        }
+
+        Console.WriteLine("Tekan enter untuk kembali ke menu utama...");
         Console.ReadLine();
-        return;
     }
-                
+
     static void Statistik()
     {
         Console.Clear();
@@ -595,22 +1029,38 @@ static void TampilkanDaftarTugasDenganStatus()
         Console.ReadLine();
         return;
     }
-                
-    static void caritugas()
+    static string hitungmundur(DateTime deadline)
     {
-        Console.Clear();
-        Console.WriteLine("cari tugas anda:");
-        Console.Write("Tekan enter untuk kembali ke menu utama");
-        Console.ReadLine();
-        return;
+        TimeSpan sisawaktu = deadline - DateTime.Now;
+        if (sisawaktu.TotalSeconds < 0)
+        {
+            TimeSpan waktuLewat = DateTime.Now - deadline;
+            if (waktuLewat.TotalDays >= 1)
+                return $"⏰ Terlewat {waktuLewat.Days} hari {waktuLewat.Hours} jam";
+            else if (waktuLewat.TotalHours >= 1)
+                return $"⏰ Terlewat {waktuLewat.Hours} jam {waktuLewat.Minutes} menit";
+            else
+                return $"⏰ Terlewat {waktuLewat.Minutes} menit {waktuLewat.Seconds} detik";
+        }
+        else if (sisawaktu.TotalDays >= 1)
+        {
+            //lebih dari 1 hari
+            return $"⏳ {sisawaktu.Days} hari {sisawaktu.Hours} jam lagi";
+        }
+        else if (sisawaktu.TotalHours >= 1)
+        {
+            //lebih dari 1 jam
+            return $"⏳ {sisawaktu.Hours} jam {sisawaktu.Minutes} menit lagi";
+        }
+        else if (sisawaktu.TotalMinutes >= 1)
+        {
+            //lebih dari 1 menit
+            return $"⏳ {sisawaktu.Minutes} menit {sisawaktu.Seconds} detik lagi";
+        }
+        else
+        {
+            return $"⏳ Hampir habis {sisawaktu.Seconds} detik lagi";
+        }
     }
-                
-    static void simpanmuatandatabase()
-    {
-        Console.Clear();
-        Console.WriteLine("belum ada isinya ");
-        Console.Write("Tekan enter untuk kembali ke menu utama");
-        Console.ReadLine();
-        return;
-    }
+
 }
