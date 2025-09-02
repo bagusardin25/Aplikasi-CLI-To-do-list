@@ -1024,8 +1024,43 @@ static void tampilkantugasbelumselesai()
     static void Statistik()
     {
         Console.Clear();
-        Console.WriteLine("statistik tugas anda:");
-        Console.Write("Tekan enter untuk kembali ke menu utama");
+        Console.WriteLine("----- Statistik Tugas Anda -----");
+    
+        int total = 0, selesai = 0, belum = 0;
+    
+        using (MySqlConnection conn = new MySqlConnection(connectionString))
+        {
+            conn.Open();
+            // Hitung total tugas
+            string queryTotal = "SELECT COUNT(*) FROM tasks WHERE user_id = @user_id";
+            using (MySqlCommand cmd = new MySqlCommand(queryTotal, conn))
+            {
+                cmd.Parameters.AddWithValue("@user_id", user_id);
+                total = Convert.ToInt32(cmd.ExecuteScalar());
+            }
+    
+            // Hitung tugas selesai
+            string querySelesai = "SELECT COUNT(*) FROM tasks WHERE user_id = @user_id AND status = 'completed'";
+            using (MySqlCommand cmd = new MySqlCommand(querySelesai, conn))
+            {
+                cmd.Parameters.AddWithValue("@user_id", user_id);
+                selesai = Convert.ToInt32(cmd.ExecuteScalar());
+            }
+    
+            // Hitung tugas belum selesai
+            string queryBelum = "SELECT COUNT(*) FROM tasks WHERE user_id = @user_id AND status = 'pending'";
+            using (MySqlCommand cmd = new MySqlCommand(queryBelum, conn))
+            {
+                cmd.Parameters.AddWithValue("@user_id", user_id);
+                belum = Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+    
+        Console.WriteLine($"Total tugas      : {total}");
+        Console.WriteLine($"Tugas selesai    : {selesai}");
+        Console.WriteLine($"Tugas belum selesai : {belum}");
+    
+        Console.WriteLine("\nTekan enter untuk kembali ke menu utama");
         Console.ReadLine();
         return;
     }
